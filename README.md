@@ -8,9 +8,13 @@
 
 
 
-## 感谢
+## 致谢
 
-感谢 [luojia65](https://github.com/luojia65)同学译制的 [使用Rust编写操作系统](https://github.com/rustcc/writing-an-os-in-rust) 一书。
+- 感谢 @[phil-opp ](https://github.com/phil-opp) 的[blog_os项目](https://github.com/phil-opp/blog_os)，[开发博客](https://os.phil-opp.com/)。
 
-感谢 [rCore-Tutorial V3](https://rcore-os.github.io/rCore-Tutorial-deploy/) 文档的编写者。
+- 感谢 [@luojia65](https://github.com/luojia65)同学由[blog_os项目](https://github.com/phil-opp/blog_os)译制的 [使用Rust编写操作系统](https://github.com/rustcc/writing-an-os-in-rust) 一书。
+
+- 感谢 [rCore-Tutorial V3](https://rcore-os.github.io/rCore-Tutorial-deploy/) 文档的编写者。
+
+
 
