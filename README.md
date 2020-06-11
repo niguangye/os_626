@@ -26,7 +26,11 @@
 
 ### 1.3 重写入口点
 
+一个典型的使用标准库的Rust程序，它的运行将从名为`crt0`的运行时库开始。`crt0`意为C runtime zero，它能建立一个适合运行C语言程序的环境，这包含了栈的创建和可执行程序参数的传入。这之后，这个运行时库会调用[Rust的运行时入口点](https://github.com/rust-lang/rust/blob/bb4d1491466d8239a7a5fd68bd605e3276e97afb/src/libstd/rt.rs#L32-L73)，这个入口点被称作**start语言项**（"start" language item）。
 
+这之后，运行时将会调用main函数。
+
+我们的独立式可执行程序并不能访问Rust运行时或`crt0`库，所以我们需要定义自己的入口点。
 
 ### 1.4 链接器错误
 
