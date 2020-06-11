@@ -8,9 +8,10 @@ edition = "2018"
 
 [dependencies]
 
-# 禁用栈展开
+# 使用`cargo build`编译时需要的配置
 [profile.dev]
-panic = "abort"
+panic = "abort" # 禁用panic时栈展开
 
+# 使用`cargo build --release`编译时需要的配置
 [profile.release]
-panic = "abort"
+panic = "abort" # 禁用panic时栈展开
