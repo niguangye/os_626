@@ -34,7 +34,20 @@
 
 ### 1.4 链接器错误
 
+链接器的默认配置假定程序依赖于C语言的运行时环境，但我们的程序并不依赖于它。
 
+为了解决这个错误，我们需要告诉链接器，它不应该包含（include）C语言运行环境。
+
+- 可以提供特定的**链接器参数**（linker argument），
+
+- 也可以选择编译为**裸机目标**（bare metal target），即底层没有操作系统的运行环境。
+
+  > ```
+  > # 安装thumbv7em-none-eabihf裸机环境，一个ARM嵌入式系统
+  > rustup target add thumbv7em-none-eabihf
+  > # 编译
+  > cargo build --target thumbv7em-none-eabihf
+  > ```
 
 ## 致谢
 
