@@ -49,6 +49,22 @@
   > cargo build --target thumbv7em-none-eabihf
   > ```
 
+## 二、最小化内核
+
+> 我们将向显示器打印字符串，最终打包内核为能引导启动的**磁盘映像**（disk image）
+
+### 2.1 引导启动
+
+### 2.2 最小化内核
+
+### 2.3 安装Nightly Rust
+
+### 2.4 编译内核
+
+### 2.5 向屏幕打印字符
+
+### 2.6 启动内核
+
 ## 致谢
 
 - 感谢 @[phil-opp ](https://github.com/phil-opp) 的[blog_os项目](https://github.com/phil-opp/blog_os)，[开发博客](https://os.phil-opp.com/)。
