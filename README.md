@@ -55,6 +55,9 @@
 
 ### 2.1 引导启动
 
+- BIOS启动
+- Multiboot标准
+
 ### 2.2 最小化内核
 
 ### 2.3 安装Nightly Rust
