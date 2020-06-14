@@ -60,6 +60,17 @@
 
 ### 2.2 最小化内核
 
+Rust语言有三个**发行频道**（release channel），分别是stable、beta和nightly.
+
+```
+# 使用rustup安装nightly版本
+rustup override add nightly
+# 查看rust版本
+rustc --version
+```
+
+目标配置清单：只需使用一个JSON文件，Rust便允许我们定义自己的目标系统
+
 ### 2.3 安装Nightly Rust
 
 ### 2.4 编译内核
