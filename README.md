@@ -60,6 +60,14 @@
 
 ### 2.2 最小化内核
 
+在默认情况下，`cargo`会为特定的**宿主系统**（host system）构建源码，比如为你正在运行的系统构建源码。
+
+这并不是我们想要的，因为我们的内核不应该基于另一个操作系统——我们想要编写的，就是这个操作系统。
+
+确切地说，我们想要的是，编译为一个特定的**目标系统**（target system）
+
+### 2.3 安装Nightly Rust
+
 Rust语言有三个**发行频道**（release channel），分别是stable、beta和nightly.
 
 ```
@@ -69,11 +77,9 @@ rustup override add nightly
 rustc --version
 ```
 
-目标配置清单：只需使用一个JSON文件，Rust便允许我们定义自己的目标系统
-
-### 2.3 安装Nightly Rust
-
 ### 2.4 编译内核
+
+目标配置清单：只需使用一个JSON文件，Rust便允许我们定义自己的目标系统
 
 ### 2.5 向屏幕打印字符
 
