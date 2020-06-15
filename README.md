@@ -79,7 +79,25 @@ rustc --version
 
 ### 2.4 编译内核
 
-目标配置清单：只需使用一个JSON文件，Rust便允许我们定义自己的目标系统
+目标配置清单：只需使用一个JSON文件，Rust便允许我们定义自己的目标系统。
+
+```
+# 安装Cargo xbuild
+cargo install cargo-xbuild
+# 编译
+cargo xbuild --target x86_64-os_626.json
+```
+
+设置默认目标，避免每次使用`cargo xbuild`传递参数
+
+```
+# in .cargo/config
+
+[build]
+target = "x86_64-blog_os.json"
+```
+
+
 
 ### 2.5 向屏幕打印字符
 
