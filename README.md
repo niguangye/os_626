@@ -94,12 +94,20 @@ cargo xbuild --target x86_64-os_626.json
 # in .cargo/config
 
 [build]
-target = "x86_64-blog_os.json"
+target = "x86_64-os_626.json"
 ```
 
 
 
 ### 2.5 向屏幕打印字符
+
+我们预先定义了一个**字节串**（byte string）类型的**静态变量**（static variable），名为`HELLO`。
+
+我们首先将整数`0xb8000`**转换**（cast）为一个**裸指针**（[raw pointer](https://doc.rust-lang.org/stable/book/second-edition/ch19-01-unsafe-rust.html#dereferencing-a-raw-pointer)）。
+
+这之后，我们迭代`HELLO`的每个字节，使用[enumerate](https://doc.rust-lang.org/core/iter/trait.Iterator.html#method.enumerate)获得一个额外的序号变量`i`。
+
+在`for`语句的循环体中，我们使用[offset](https://doc.rust-lang.org/std/primitive.pointer.html#method.offset)偏移裸指针，解引用它，来将字符串的每个字节和对应的颜色字节——`0xb`代表淡青色——写入内存位置。
 
 ### 2.6 启动内核
 
