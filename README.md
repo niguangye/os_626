@@ -111,6 +111,28 @@ target = "x86_64-os_626.json"
 
 ### 2.6 启动内核
 
+- 引入bootloader包
+- 安装bootimage工具
+-  编译镜像
+
+```
+# 编译镜像
+cargo bootimage
+1. 编译我们的内核为一个ELF（Executable and Linkable Format）文件；
+2. 编译引导程序为独立的可执行文件；
+3. 将内核ELF文件按字节拼接（append by bytes）到引导程序的末端。
+```
+
+- 在QEMU中启动内核
+
+  >  当机器启动时，引导程序将会读取并解析拼接在其后的ELF文件。这之后，它将把程序片段映射到**分页表**（page table）中的**虚拟地址**（virtual address），清零**BSS段**（BSS segment），还将创建一个栈。最终它将读取**入口点地址**（entry point address）——我们程序中`_start`函数的位置——并跳转到这个位置。
+
+  ```
+   qemu-system-x86_64 -drive format=raw,file=bootimage-blog_os.bin
+  ```
+
+  
+
 ## 致谢
 
 - 感谢 @[phil-opp ](https://github.com/phil-opp) 的[blog_os项目](https://github.com/phil-opp/blog_os)，[开发博客](https://os.phil-opp.com/)。
