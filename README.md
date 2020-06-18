@@ -112,16 +112,18 @@ target = "x86_64-os_626.json"
 ### 2.6 启动内核
 
 - 引入bootloader包
+
 - 安装bootimage工具
+
 -  编译镜像
 
-```
-# 编译镜像
-cargo bootimage
-1. 编译我们的内核为一个ELF（Executable and Linkable Format）文件；
-2. 编译引导程序为独立的可执行文件；
-3. 将内核ELF文件按字节拼接（append by bytes）到引导程序的末端。
-```
+  ```
+  # 编译镜像
+  cargo bootimage
+  1. 编译我们的内核为一个ELF（Executable and Linkable Format）文件；
+  2. 编译引导程序为独立的可执行文件；
+  3. 将内核ELF文件按字节拼接（append by bytes）到引导程序的末端。
+  ```
 
 - 在QEMU中启动内核
 
@@ -129,6 +131,19 @@ cargo bootimage
 
   ```
    qemu-system-x86_64 -drive format=raw,file=bootimage-blog_os.bin
+  ```
+
+- 使用cargo run
+
+  ```
+  #在cargo配置文件中设置`runner`配置项
+  # in .cargo/config
+  
+  [target.'cfg(target_os = "none")']
+  runner = "bootimage runner"
+  
+  # 启动
+  cargo xrun
   ```
 
   
