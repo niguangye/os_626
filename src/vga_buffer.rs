@@ -21,3 +21,16 @@ pub enum Color {
     Yellow = 14,
     White = 15,
 }
+
+// VGA字符缓冲区字符单元颜色部分的抽象结构
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+struct ColorCode(u8);
+
+// 注意此函数没有显示使用return
+// (background as u8) << 4 | (foreground as u8) back左移四位与fore组合成新的u8
+impl ColorCode {
+    fn new(foreground: Color, background: Color) -> ColorCode {
+        ColorCode((background as u8) << 4 | (foreground as u8))
+    }
+}
