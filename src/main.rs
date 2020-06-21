@@ -1,6 +1,8 @@
 #![no_std] // 禁用标准库链接
 #![no_main] // 告诉Rust编译器我们不使用预定义的入口点
 
+mod vga_buffer;
+
 use core::panic::PanicInfo;
 
 static HELLO: &[u8] = b"Hello World!";
