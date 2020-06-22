@@ -57,6 +57,13 @@ struct Buffer {
     chars: [[ScreenChar; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
+// 负责将字符写入屏幕的最后一行，并在一行写满或收到换行符\n的时候，将所有字符上移一行
+pub struct Writer {
+    column_position: usize, // 跟踪光标在最后一行的位置
+    color_code: ColorCode, // 颜色模式：backgroundColor+foregroundColor
+    buffer: &'static mut Buffer, //VGA字符缓冲区的可变借用, 'static在整个运行期间有效，保证该可变借用内存安全
+}
+
 
 
 
