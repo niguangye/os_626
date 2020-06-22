@@ -64,6 +64,36 @@ pub struct Writer {
     buffer: &'static mut Buffer, //VGA字符缓冲区的可变借用, 'static在整个运行期间有效，保证该可变借用内存安全
 }
 
+impl Writer {
+    pub fn write_byte(&mut self, byte: u8) {
+        // 注意此处的模式匹配
+        match byte {
+            // 收到‘\n’时，另起一行
+            b'\n' => self.new_line(),
+            byte => {
+                // 该行写满时另起一行
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+                //利用chars二维数组，向制定位置写入字符byte
+                self.buffer.chars[row][col] = ScreenChar {
+                    ascii_character: byte,
+                    color_code: self.color_code,
+                };
+                self.column_position += 1;
+            }
+        }
+    }
+
+    fn new_line(&mut self){
+        // TODO
+    }
+
+}
+
 
 
 
