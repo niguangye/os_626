@@ -94,6 +94,20 @@ impl Writer {
 
 }
 
+impl Writer {
+    pub fn write_string(&mut self, s: &str){
+        for byte in s.bytes() {
+            // 依然是模式匹配
+            match byte {
+                // 从空格（0x20）到波浪号（0x7e）
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                // rust默认支持UTF-8，所以存在VGA缓冲区不支持的字节，此时打印■（0xfe）
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+}
+
 
 
 
