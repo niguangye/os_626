@@ -170,6 +170,20 @@ mod vga_buffer;
 
 ### 3.3 打印字符
 
+```
+# 这个函数首先创建一个指向0xb8000地址VGA缓冲区的Writer。
+# 实现这一点，我们需要编写的代码可能看起来有点奇怪：
+# 首先，我们把整数0xb8000强制转换为一个可变的裸指针（raw pointer）；
+# 之后，通过运算符*，我们将这个裸指针解引用；最后，我们再通过&mut，再次获得它的可变借用。
+# 这些转换需要**unsafe语句块**（unsafe block），因为编译器并不能保证这个裸指针是有效的。
+let mut writer = Writer {
+    column_position: 0,
+    color_code: ColorCode::new(Color::Yellow, Color::Black),
+    buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+};
+
+```
+
 ### 3.4 易失操作
 
 ### 3.5 格式化宏
