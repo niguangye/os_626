@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 bootloader = "0.9.0"
+volatile = "0.2.3"
 
 # 使用`cargo build`编译时需要的配置
 [profile.dev]

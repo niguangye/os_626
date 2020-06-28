@@ -1,4 +1,4 @@
-
+use volatile::Volatile;
 
 #[allow(dead_code)] //抑制 `dead_code` lint
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,7 +54,7 @@ const BUFFER_WIDTH: usize = 80;
 // 此时Buffer即从某个地址起始的 16x80x25 bit 长度的内存，chars正好映射该段内存
 #[repr(transparent)]
 struct Buffer {
-    chars: [[ScreenChar; BUFFER_WIDTH]; BUFFER_HEIGHT],
+    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
 // 负责将字符写入屏幕的最后一行，并在一行写满或收到换行符\n的时候，将所有字符上移一行
@@ -79,10 +79,10 @@ impl Writer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
                 //利用chars二维数组，向制定位置写入字符byte
-                self.buffer.chars[row][col] = ScreenChar {
+                self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
-                };
+                });
                 self.column_position += 1;
             }
         }
