@@ -10,7 +10,10 @@ use crate::vga_buffer::print_something;
 // extern "C" 告诉编译器这个函数应当使用C语言的调用约定
 pub extern "C" fn _start() -> ! {
 
-    print_something();
+    // print_something();
+    use core::fmt::Write;
+    vga_buffer::WRITER.lock().write_str("Hello again").unwrap();
+    write!(vga_buffer::WRITER.lock(), ", some numbers: {} {}", 42, 1.337).unwrap();
     loop {}
 }
 
