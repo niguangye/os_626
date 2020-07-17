@@ -1,5 +1,8 @@
 #![no_std] // 禁用标准库链接
 #![no_main] // 告诉Rust编译器我们不使用预定义的入口点
+#![feature(custom_test_frameworks)]
+#![test_runner(crate::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
 mod vga_buffer;
 
@@ -10,7 +13,10 @@ use core::panic::PanicInfo;
 pub extern "C" fn _start() -> ! {
 
     println!("Hello World{}", "!");
-    panic!("Some panic message");
+
+    #[cfg(test)]
+    test_main();
+
     loop {}
 }
 
@@ -22,5 +28,24 @@ fn panic(_info: &PanicInfo) -> ! {
     println!("{}", _info);
     loop {}
 }
+
+#[cfg(test)]
+fn test_runner(tests: &[&dyn Fn()]) {
+    println!("Running {} tests", tests.len());
+    for test in tests {
+        test();
+    }
+}
+
+#[test_case]
+fn trivial_assertion() {
+    print!("trivial assertion... ");
+    assert_eq!(1, 1);
+    println!("[ok]");
+}
+
+
+
+
 
 

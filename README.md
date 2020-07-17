@@ -210,6 +210,14 @@ let mut writer = Writer {
 
 ### 4.1 自定义测试框架
 
+​	Rust有一个**内置的测试框架**（[built-in test framework](https://doc.rust-lang.org/book/second-edition/ch11-00-testing.html)）：无需任何设置就可以进行单元测试。
+
+​	不幸的是，Rust的测试框架会隐式的调用内置的[`test`](https://doc.rust-lang.org/test/index.html)库。
+
+​	这也就是说我们的 `#[no_std]`内核无法使用默认的测试框架
+
+​	Rust支持通过使用不稳定的**自定义测试框架**（[`custom_test_frameworks`](https://doc.rust-lang.org/unstable-book/language-features/custom-test-frameworks.html)） 功能来替换默认的测试框架。该功能不需要额外的库，因此在 `#[no_std]`环境中它也可以工作。
+
 ### 4.2 退出QEMU
 
 ### 4.3 打印到控制台
