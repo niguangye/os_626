@@ -220,6 +220,8 @@ let mut writer = Writer {
 
 ### 4.2 退出QEMU
 
+​		QEMU支持一种名为 `isa-debug-exit`的特殊设备，它提供了一种从客户系统（guest system）里退出QEMU的简单方式。为了使用这个设备，我们需要向QEMU传递一个`-device`参数。
+
 ### 4.3 打印到控制台
 
 ### 4.4 测试VGA缓冲区
