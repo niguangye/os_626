@@ -224,6 +224,10 @@ let mut writer = Writer {
 
 ### 4.3 打印到控制台
 
+​	要在控制台上查看测试输出，我们需要以某种方式将数据从内核发送到宿主系统。
+
+​	发送数据的一个简单的方式是通过[串行端口](https://en.wikipedia.org/wiki/Serial_port)，为了查看QEMU的串行输出，我们需要使用`-serial`参数将输出重定向到stdout。
+
 ### 4.4 测试VGA缓冲区
 
 ### 4.5 集成测试
