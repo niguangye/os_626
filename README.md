@@ -234,7 +234,7 @@ let mut writer = Writer {
 
 ### 4.5 集成测试
 
-
+​	在Rust中，**集成测试**（[integration tests](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests)）的约定是将其放到项目根目录中的`tests`目录下(即`src`的同级目录)。无论是默认测试框架还是自定义测试框架都将自动获取并执行该目录下所有的测试。
 
 ### 4.6 未来的测试
 
