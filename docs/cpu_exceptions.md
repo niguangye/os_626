@@ -16,12 +16,12 @@
 
 在x86体系结构中，有大约20种不同的CPU 异常类型。常见的如下：
 
-- **缺页错误（Page Fault）**：
+- **缺页错误（Page Fault）**：缺页错误发生在非法的内存访问操作中。例如：当前指令试图访问没有映射的内存页或试图写入只读的内存页。
 
-- **非法操作码（Invalid Opcode）**：
-- **通用保护错误（General Protection Fault）**：
-- **双重异常（Double Fault）**：
-- **三重异常（Triple Fault）**：
+- **非法操作码（Invalid Opcode）**：非法操作码发生在当前指令不正确的情况下。例如：试图在不支持 [SSE 指令集](https://en.wikipedia.org/wiki/Streaming_SIMD_Extensions) 的老旧CPU上使用该指令集。
+- **通用保护错误（General Protection Fault）**：这是一个触发原因相对宽泛的异常。试图在用户态程序中执行特权指令或试图写入配置寄存器的保留位等非法访问操作均会触发该异常。
+- **双重异常（Double Fault）**：异常发生后，CPU会调用对应的异常处理函数。在调用过程中如果发生另一个异常，CPU会触发双重异常。双重异常也会在找不到对应的异常处理函数的情况下发生。
+- **三重异常（Triple Fault）**：如果异常发生在CPU调用双重异常处理函数的过程中，这会导致严重的三重异常。我们不能捕获或者处理三重异常。大多数处理器会选择复位并重启操作系统。
 
 你可以在[这里](https://wiki.osdev.org/Exceptions)找到所有的CPU异常列表。
 
