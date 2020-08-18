@@ -8,6 +8,8 @@
 
 触发CPU异常的情况多种多样，例如：访问非法内存地址或执行非法指令（除以零）等。为了应对CPU异常，我们需要建立中断描述符表（interrupt descriptor table)，它列举了不同异常所对应的处理函数(handler functions)。在博文的最后，我们的内核（kernel)可以捕获断点异常（[breakpoint exceptions](https://wiki.osdev.org/Exceptions#Breakpoint)）并且恢复CPU的正常运行。
 
+[TOC]
+
 ## 概述
 
 异常的发生标志着当前正在执行的指令出现了问题。例如：指令试图除以0的时候，CPU会抛出一个异常。当异常发生，CPU会中断（interrupt）它当前的流程，并立即调用该类型异常对应的处理函数。
@@ -108,16 +110,6 @@ type HandlerFunc = extern "x86-interrupt" fn(_: &mut InterruptStackFrame);
 ## 中断调用约定（ The Interrupt Calling Convention）
 
 CPU异常与函数调用非常相似：CPU跳转到调用函数的第一条指令并执行它。然后，CPU跳转到返回地址并继续执行函数的调用者函数（`parent function`)。
-
-```
-译者注：函数调用即A函数在执行过程中，调用了B函数，待B函数执行完毕后，回到A函数继续执行。
-A函数被称为调用者函数，B函数即被调用者函数。
-function A {
-	...
-	B();
-	...
-}
-```
 
 然而，异常和函数调用有一个重要的区别：函数调用是被编译器生成的 `call` 指令主动发起，而
 
@@ -279,7 +271,7 @@ error: `idt` does not live long enough
 
  `load` 方法期望一个 `&'static self`，以确保 `idt` 引用在整个程序生命周期中可用。因为CPU会在每个异常发生的时候访问这张表，直到我们加载了其它的`InterruptDescriptorTable`对象。所以，使用比 `'static` 短的生命周期会导致 use-after-free bug。
 
-事实上，情况很明白。我们的 `idt`  在栈上创建，所以它只在 `init` 函数的生命周期中有效。一旦这个栈内存被其它函数重用，CPU会把随机的栈内存当作IDT。幸运的是， `InterruptDescriptorTable::load` 在函数定义中明确了必要的生命周期条件（译者注：也就是必须使用 `'static` 生命周期）。所以，Rust 编译器可以在编译期就阻止这个潜在的 bug 。
+事实上，情况很明白。我们的 `idt`  在栈上创建，所以它只在 `init` 函数的生命周期中有效。一旦这个栈内存被其它函数重用，CPU会把随机的栈内存当作IDT。幸运的是， `InterruptDescriptorTable::load` 在函数定义中明确要求了必要的生命周期条件（译者注：也就是必须使用 `'static` 生命周期）。所以，Rust 编译器可以在编译期就阻止这个潜在的 bug 。
 
 为了解决这个问题，我们需要保存我们的 `idt` 对象到拥有 `'static` 生命周期的地方。我们可以使用 `Box` 把 IDT 分配到堆上，并转换为 `'static` 引用，但是我们是在开发操作系统内核，所以并不会有堆这个概念。
 
@@ -309,7 +301,7 @@ pub fn init_idt() {
 
 这种变体不会出现编译错误，但是并不符合优雅的编程风格。 `static mut` 非常容易造成数据竞争，所以在每一次访问中都需要使用 [`unsafe`](https://doc.rust-lang.org/1.30.0/book/second-edition/ch19-01-unsafe-rust.html#unsafe-superpowers) 代码块。
 
-### 懒加载常量
+#### 懒加载常量
 
  `lazy_static` 宏的存在令人庆幸。它可以让常量在被第一次使用的时候被初始化，而不是在编译期。因此，我们可以在初始化代码块中做几乎所有的事情，甚至读取常量在运行时的值。
 
