@@ -13,8 +13,15 @@ pub extern "C" fn _start() -> ! {
 
     println!("Hello World{}", "!");
 
+    os_626::init();
+
+    // 调用int3指令触发断点异常
+    x86_64::instructions::interrupts::int3();
+
     #[cfg(test)]
     test_main();
+
+    println!("It did not crash!");
 
     loop {}
 }
