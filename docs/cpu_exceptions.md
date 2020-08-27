@@ -2,7 +2,7 @@
 
 > 原文：[https://os.phil-opp.com/cpu-exceptions/](https://os.phil-opp.com/cpu-exceptions/)
 >
-> 原作者：@phil-opp
+> 原作者：[@Philipp Oppermann](https://github.com/phil-opp) 
 >
 > 译者：[倪广野](https://github.com/niguangye)
 
@@ -327,7 +327,7 @@ pub fn init_idt() {
 
 ### 运行
 
-让内核种的异常处理工作的最后一步是在 `main.rs` 中调用 `init_idt` 函数。在 `lib.rs` 中抽象一个总体的 `init` 函数而不是直接调用:
+让内核种中异常处理函数正确运行的最后一步是在 `main.rs` 中调用 `init_idt` 函数。在 `lib.rs` 中抽象一个总体的 `init` 函数而不是直接调用:
 
 ```
 // in src/lib.rs
@@ -391,22 +391,29 @@ pub extern "C" fn _start() -> ! {
 
 现在，创建一个 `test_breakpoint_exception` 测试：
 
-```
+```rust
 // in src/interrupts.rs
+
+#[cfg(test)] // //译者添加
+use crate::{serial_print, serial_println}; // 译者添加
 
 #[test_case]
 fn test_breakpoint_exception() {
+	serial_print!("test_breakpoint_exception..."); // 译者添加
     // invoke a breakpoint exception
     x86_64::instructions::interrupts::int3();
+    serial_println!("[ok]"); // 译者添加
 }
 ```
+
+> 译注：博客中并未指出在test_breakpoint_exception()函数中添加打印函数（serial_print!两行）。经过比对 [GitHub](https://github.com/phil-opp/blog_os) 分支上的对应代码，此处应当添加打印函数，后文中测试消息才能正常显示。
 
 这个测试调用了 `x86_64` 库的 `int3` 函数去触发断点异常。通过检查异常处理后程序继续执行，可以验证断点异常处理函数正常工作。
 
 使用 `cargo test` （所有测试）或 `cargo test --lib`（只限于 `lib.rs` 和它的子模块中的测试）命令运行新的测试，应当可以看见：
 
 ```
-blog_os::interrupts::test_breakpoint_exception...	[ok]
+test_breakpoint_exception...	[ok]
 ```
 
 ## 过于抽象?（ Too much Magic?）
