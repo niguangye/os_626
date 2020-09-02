@@ -50,13 +50,51 @@ pub extern "C" fn _start() -> ! {
 现在启动内核，它会进入到无穷尽的启动循环。原因如下：
 
 1. *CPU* 试图写入非法的内存地址 `0xdeadbeef` ，这会触发缺页异常。
-2. *CPU* 查找到 *IDT* 中缺页异常对应的条目，并且发现没有对应的处理函数。因此，它不能调用缺页异常的处理函数，进而触发双重异常。
+2. *CPU* 查找到 *IDT* 中缺页异常对应的条目，并且没有发现对应的处理函数。因为它不能正常调用缺页异常的处理函数，所以触发了双重异常。
 3. *CPU* 查找到 *IDT* 中双重异常对应的条目，并且也没有发现对应的处理函数。因此，三重异常被触发。
 4. 三重异常是致命的。*QEMU* 像大多数的硬件一样选择系统复位。
 
 所以为了阻止三重异常，我们需要提供缺页异常或双重异常的处理函数。我们希望阻止所有情况下的三重异常，因此我们选择建立所有异常未被处理时都会调用的双重异常处理函数。
 
 ## 双重异常处理函数
+
+双重异常由普通异常和错误码组成，所以我们可以像断点异常处理函数那样定义一个双重异常处理函数。
+
+```rust
+// in src/interrupts.rs
+
+lazy_static! {
+    static ref IDT: InterruptDescriptorTable = {
+        let mut idt = InterruptDescriptorTable::new();
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.double_fault.set_handler_fn(double_fault_handler); // new
+        idt
+    };
+}
+
+// new
+extern "x86-interrupt" fn double_fault_handler(
+    stack_frame: &mut InterruptStackFrame, _error_code: u64) -> !
+{
+    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+}
+```
+
+双重异常处理函数打印了一个简短的错误消息和异常栈帧信息。双重异常的错误码通常会是0，所以没有必要打印出来。双重异常处理函数和断点异常处理函数的区别在于，它是一个发散函数（ [*diverging*](https://doc.rust-lang.org/stable/rust-by-example/fn/diverging.html)）。因为 `x86_64` 体系架构不允许从双重异常中返回。
+
+现在启动内核，我们可以看见双重异常处理函数被调用了：
+
+![qemu-catch-double-fault](https://markdown-ngy.oss-cn-beijing.aliyuncs.com/qemu-catch-double-fault.png)
+
+工作正常！这次发生了什么：
+
+1. *CPU* 试图写入非法的内存地址 `0xdeadbeef` ，这会触发缺页异常。
+2. 像上次一样，*CPU* 查找到 *IDT* 中缺页异常对应的条目，并且没有发现对应的处理函数。因为它不能正常调用缺页异常的处理函数，所以触发了双重异常。
+3. *CPU* 跳转到双重异常处理函数——它现在是就绪的了。
+
+因为 *CPU* 现在可以正常调用双重异常处理函数，所以三重异常（和启动循环）不会再次出现。
+
+这非常容易理解！那么我们为什么需要用整篇文章讨论这个话题? 我们现在可以捕获大多数双重异常，但是在某些情况下，现在的方式并不足够有效。
 
 
 
