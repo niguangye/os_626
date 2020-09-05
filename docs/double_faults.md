@@ -100,9 +100,75 @@ extern "x86-interrupt" fn double_fault_handler(
 
 ## 双重异常的触发原因
 
+在探究某个特定的原因之前，我们需要理解双重异常的确切定义。上文中，我们给出了相当粗略的定义：
+
+> 双重异常就是一个在CPU调用异常处理函数失败的时候触发的特定异常。
+
+“调用异常处理函数失败”的准确含义是什么? 处理函数不可用? 处理函数被换出（ [swapped out](http://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys.pdf)）? 并且如果处理函数自身触发了异常会发生什么?
+
+例如，下列情况会发生什么：
+
+1. 断点异常触发，但是对应的处理函数被换出?
+2. 缺页异常触发，但是缺页异常处理函数被换出?
+3. 除0异常引发了断点异常，但是断点异常处理函数被换出?
+4. 内核栈溢出，同时保护页（ *guard page*）被命中（*hit*）? 
+
+幸运的是，AMD64手册（([PDF](https://www.amd.com/system/files/TechDocs/24593.pdf)）给出了明确定义（8.2.9章节）。根据手册的定义，“当第二个异常出现在先前的（第一个）异常处理函数执行期间，双重异常**可能**会被触发”。“**可能**”二字说明：只有特定的异常组合才会导致双重异常。这些组合是：
+
+| 第一个异常                                                   | 第二个异常                                                   |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [Divide-by-zero，除0](https://wiki.osdev.org/Exceptions#Divide-by-zero_Error),<br> [Invalid TSS，非法任务状态段](https://wiki.osdev.org/Exceptions#Invalid_TSS), <br/>[Segment Not Present，段不存在](https://wiki.osdev.org/Exceptions#Segment_Not_Present),<br/> [Stack-Segment Fault，栈段错误](https://wiki.osdev.org/Exceptions#Stack-Segment_Fault), <br/>[General Protection Fault，一般保护错误](https://wiki.osdev.org/Exceptions#General_Protection_Fault) | [Invalid TSS，非法任务状态段](https://wiki.osdev.org/Exceptions#Invalid_TSS), <br/>[Segment Not Present，段不存在](https://wiki.osdev.org/Exceptions#Segment_Not_Present), <br/>[Stack-Segment Fault，栈段错误](https://wiki.osdev.org/Exceptions#Stack-Segment_Fault), <br/>[General Protection Fault，一般保护错误](https://wiki.osdev.org/Exceptions#General_Protection_Fault) |
+| [Page Fault，缺页异常](https://wiki.osdev.org/Exceptions#Page_Fault) | [Page Fault，缺页异常](https://wiki.osdev.org/Exceptions#Page_Fault),<br/> [Invalid TSS，非法任务状态段](https://wiki.osdev.org/Exceptions#Invalid_TSS), <br/>[Segment Not Present，段不存在](https://wiki.osdev.org/Exceptions#Segment_Not_Present),<br/> [Stack-Segment Fault，栈段错误](https://wiki.osdev.org/Exceptions#Stack-Segment_Fault),<br/> [General Protection Fault，一般保护错误](https://wiki.osdev.org/Exceptions#General_Protection_Fault) |
+
+所以缺页异常紧跟除0异常不会触发双重异常（缺页异常处理函数被调用），但是一般保护错误紧跟除0异常一定会触发双重异常。
+
+参考这张表格，可以得到上述前三个问题的答案：
+
+1. 断点异常触发，但是对应的处理函数被换出，缺页异常会被触发，然后调用缺页异常处理函数。
+2. 缺页异常触发，但是缺页异常处理函数被换出，双重异常会被触发，然后调用双重异常处理函数。
+3. 除0异常引发了断点异常，CPU试图调用断点异常处理函数。如果断点异常处理函数被换出，缺页异常会被触发，然后调用缺页异常处理函数。
+
+实际上，异常在 *IDT* 中没有对应的处理函数时会遵顼以下方案：
+
+当异常发生时，*CPU* 试图读取对应的 *IDT* 条目。如果条目是0，说明这不是一个合法的 *IDT* 条目，一般保护错误会被触发。我们没有定义一般保护错误的处理函数，所以另一个一般保护错误被触发。根据上表，这会导致双重异常。
+
 ### 内核栈溢出
 
+让我们开始探究第四个问题：
 
+> 内核栈溢出，同时保护页（ *guard page*）被命中（*hit*）? 
+
+保护页是存在栈底的特定内存页，它被用来发现栈溢出。保护页没有映射到任何物理内存页，所以访问它会导致缺页异常而不是无声无息地损坏其它内存。引导程序（*bootloader*）为内核栈建立了保护页，所以内核栈溢出会触发缺页异常。
+
+当缺页异常发生，CPU 查找 IDT 中地缺页异常处理函数并将中断栈帧（ [interrupt stack frame](https://os.phil-opp.com/cpu-exceptions/#the-interrupt-stack-frame)）压入内核栈。然而，当前栈指针依然指向不可用地保护页。因此，第二个缺页异常被触发了，这会引发双重异常（根据上表）。
+
+CPU 试图调用双重异常处理函数，它当然会试图压入异常栈帧。此时栈指针依然会指向保护页（因为栈溢出了），所以第三个缺页异常被触发了，紧接着三重异常和系统复位也发生了。当前的双重异常处理函数无法阻止这种情形下的三重异常。
+
+让我们复现这个情形吧！通过调用无穷的递归函数可以轻易引发内核栈溢出：
+
+```rust
+// in src/main.rs
+
+#[no_mangle] // don't mangle the name of this function
+pub extern "C" fn _start() -> ! {
+    println!("Hello World{}", "!");
+
+    blog_os::init();
+
+    fn stack_overflow() {
+        stack_overflow(); // for each recursion, the return address is pushed
+    }
+
+    // trigger a stack overflow
+    stack_overflow();
+
+    […] // test_main(), println(…), and loop {}
+}
+```
+
+在QEMU中执行程序的时候，操作系统再次进入无限重启的情况：
+
+如何阻止这个问题? 由于压入异常栈帧是CPU硬件的操作，所以我们不能干扰这一步。我们只能以某种方式让内核栈在双重异常触发的时候保持可用（不会溢出）。幸运的是，`x86_64` 架构提供了这个问题的解决方式。
 
 ## 切换栈
 
