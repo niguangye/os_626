@@ -172,11 +172,115 @@ pub extern "C" fn _start() -> ! {
 
 ## 切换栈
 
+`x86_64` 架构可以在异常发生时切换到预定义且已知良好的栈中。这个切换发生在硬件级别，所以它可以在*CPU*压入异常栈帧之前完成。
+
+切换机制基于中断栈表（ *Interrupt Stack Table* ，*IST*）。*IST*由7个指向已知良好的栈的指针组成。Rust风格的伪代码：
+
+```rust
+struct InterruptStackTable {
+    stack_pointers: [Option<StackPointer>; 7],
+}
+```
+
+对于每一个异常处理器，我们可以通过对应 [IDT entry](https://os.phil-opp.com/cpu-exceptions/#the-interrupt-descriptor-table) 中的 `stack_pointers`字段在 *IST* 中找到一个栈。例如，双重异常处理器可以使用 *IST* 中的第一个栈。此后，CPU会主动在双重异常发生时切换到这个栈。切换之前不会由任何东西被压入栈中，所以它可以阻止三重异常的发生。
+
 ### 中断栈表和任务状态段（ The IST and TSS）
+
+中断栈表是早期遗留下来的结构体——任务状态段（ *[Task State Segment](https://en.wikipedia.org/wiki/Task_state_segment)，TSS*）的一部分。在32位模式下，*TSS* 被用来保存任务（*task*）相关的各种信息（例如寄存器的状态），包括硬件上下文切换（[hardware context switching](https://wiki.osdev.org/Context_Switching#Hardware_Context_Switching)）等。然而，在64位模式下，硬件上下文切换不再被支持，同时 *TSS* 的格式也已经面目全非。
+
+在 `x86_64` 架构下，*TSS* 不再保存任何关于任务（*task*）的信息。取而代之的是两个栈表（ *IST* 是其中之一）。*TSS* 在32位和64位模式下唯一相同的字段是指向 [I/O port permissions bitmap](https://en.wikipedia.org/wiki/Task_state_segment#I.2FO_port_permissions) 的指针。
+
+在64位模式下， *TSS* 的格式如下：
+
+| Field                             | Type       |
+| --------------------------------- | ---------- |
+| (保留位)                          | `u32`      |
+| 特权栈表（Privilege Stack Table） | `[u64; 3]` |
+| (保留位)                          | `u64`      |
+| 中断栈表（Interrupt Stack Table） | `[u64; 7]` |
+| (保留位)                          | `u64`      |
+| (保留位)                          | `u16`      |
+| I/O Map Base Address              | `u16`      |
+
+特权栈表会在 *CPU* 改变特权级别的时候被使用。例如，*CPU* 处在用户模式（*user mode*，特权级别 3 ）时触发了异常，它通常会在调用异常处理函数之前切换到内核模式（*kernel mode*，特权级别 0 ）。在这种情况下，*CPU* 会切换到特权栈表的第0个栈中（因为目标特权级别是0）。我们当前的内核没有运行在用户模式下的程序，所以可以暂时忽略特权栈表。
 
 ### 创建任务状态段
 
-### 全局描述符表
+为了创建一个在自身的中断栈表中包含不同双重异常栈的 *TSS* ，我们需要一个 *TSS* 结构体。幸运的是， `x86_64` 模块已经提供了 [`TaskStateSegment` 结构体](https://docs.rs/x86_64/0.12.1/x86_64/structures/tss/struct.TaskStateSegment.html) 供我们使用。
+
+我们在新的 `gdt` 模块（下文中解释）中创建 *TSS* 。
+
+```rust
+// in src/lib.rs
+
+pub mod gdt;
+
+// in src/gdt.rs
+
+use x86_64::VirtAddr;
+use x86_64::structures::tss::TaskStateSegment;
+use lazy_static::lazy_static;
+
+pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
+
+lazy_static! {
+    static ref TSS: TaskStateSegment = {
+        let mut tss = TaskStateSegment::new();
+        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = 4096 * 5;
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+
+            let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
+            let stack_end = stack_start + STACK_SIZE;
+            stack_end
+        };
+        tss
+    };
+}
+```
+
+由于Rust的常量求值器（ Rust's const evaluator ）并不支持在编译期内完成初始化，所以我们使用了 `lazy_static` 。我们定义了 *IST* 的第0个条目指向双重异常栈（ *IST* 的其它条目也可以正常运行），然后向第0个条目写入了双重异常栈的顶部地址（因为 `x86` 机器的栈地址向下扩展，也就是从高地址到低地址）。
+
+因为我们的内核还没有实现内存管理机制，所以我们还没有一个像样的方式去分配新的栈。作为替代，我们当前使用 `static mut` 数组作为栈的存储。 `unsafe` 是必要的，因为编译器不能确保可变静态变量被访问时的竞争自由。使用 `static mut` 而不是 `static` 是因为 *bootloader* 会把它映射到只读内存页上。下篇文章中，我们会使用一个像样的栈内存分配方式去取代这个方式，那时就不再需要 `unsafe` 了。
+
+不得不提的是，这个双重异常栈没有保护页去避免栈溢出。这意味着我们不能在双重异常处理函数中做任何过度使用函数栈的的事情，以避免栈溢出破坏栈地址以下的内存。
+
+#### 加载 *TSS*
+
+我们需要一种方式让 *CPU* 明白新的 *TSS* 已经可用了。不幸的是，这个过程很复杂，因为 *TSS* 使用了分段系统（历史遗留问题）。既然不能直接加载 *TSS* ，我们需要在全局描述符表（ *[Global Descriptor Table](https://web.archive.org/web/20190217233448/https://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/) ，GDT*）中增加一个段描述符。然后就可以通过各自的 *GDT* 指针调用 [`ltr` 指令](https://www.felixcloutier.com/x86/ltr) 去加载 *TSS* 。
+
+### 全局描述符表（ The Global Descriptor Table，GDT）
+
+全局描述符表是分页机制成为事实上的标准之前的一个古老概念，它被用于内存分段（ [memory segmentation](https://en.wikipedia.org/wiki/X86_memory_segmentation) ）。全局描述符表在64位模式下依然发挥着作用，例如内核/用户模式的配置和 *TSS* 的加载。*GDT* 包含了一个程序的所有分段。在分页机制还没有成为标准的古老体系架构中，*GDT* 被用来隔离所有的程序。你可以检阅开源手册 [“Three Easy Pieces” ](http://pages.cs.wisc.edu/~remzi/OSTEP/) 的同名章节获取更多关于分段机制的信息。虽然64位模式下不再支持分段机制，但是*GDT* 仍然保留了下来。它被用于两件事情：在内核空间和用户空间之间切换，加载 *TSS* 结构体。
+
+#### 创建GDT
+
+创建一个包含用于 `TSS` 静态变量的段的 *GDT* ：
+
+```rust
+// in src/gdt.rs
+
+use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor};
+
+lazy_static! {
+    static ref GDT: GlobalDescriptorTable = {
+        let mut gdt = GlobalDescriptorTable::new();
+        gdt.add_entry(Descriptor::kernel_code_segment());
+        gdt.add_entry(Descriptor::tss_segment(&TSS));
+        gdt
+    };
+}
+```
+
+由于Rust的常量求值器（ Rust's const evaluator ）并不支持在编译期内完成初始化，所以我们再次使用了 `lazy_static` 。我们创建了一个包含代码段（code segment）和 *TSS* 段（ *TSS* segment）的 *GDT* 。
+
+#### 加载GDT
+
+由于段寄存器和 *TSS* 寄存器仍然保存着来自于旧的 *GDT* 的内容，我们新 *GDT* 的分段并没有起作用。所以我们还需要修改双重异常对应的 *IDT* 条目去让它使用新的栈。
+
+总的来说，我们需要完成以下步骤：
+
+1. 
 
 ### 最后的步骤
 
