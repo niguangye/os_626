@@ -276,15 +276,104 @@ lazy_static! {
 
 #### 加载GDT
 
+通过在 `init` 函数调用新建立的 `gdt::init` 函数加载 *GDT* ：
+
+```rust
+// in src/gdt.rs
+
+pub fn init() {
+    GDT.load();
+}
+
+// in src/lib.rs
+
+pub fn init() {
+    gdt::init();
+    interrupts::init_idt();
+}
+```
+
+现在 *GDT* 已经加载完毕（因为 `_start` 函数调用了 `init` 函数），但是仍然出现了栈溢出引发的启动循环。
+
+### 最后的步骤
+
 由于段寄存器和 *TSS* 寄存器仍然保存着来自于旧的 *GDT* 的内容，我们新 *GDT* 的分段并没有起作用。所以我们还需要修改双重异常对应的 *IDT* 条目去让它使用新的栈。
 
 总的来说，我们需要完成以下步骤：
 
-1. 
+1. **重新装载代码段寄存器**：我们修改了 *GDT* ，所以应当重新装载代码段寄存器—— `cs` 。这是必要的，既然现在旧的段选择子可以指向不同的 *GDT* 描述符（例如 *TSS* 描述符）。
+2. **加载 *TSS*** ：我们已经加载了包含 *TSS* 段选择子的 *GDT* ，但是仍然需要告知 *CPU* 使用新的 *TSS* 。
+3. **更新 IDT 条目**：一旦 *TSS* 加载完毕，CPU便访问到了合法的中断栈表（ *IST* ）。然后通过更新双重异常条目告知 *CPU* 使用新的双重异常栈。
 
-### 最后的步骤
+第一、二步需要我们在 `gdt::init` 函数中访问 `code_selector` 和 `tss_selector` 变量。为了实现这个操作，我们可以通过一个新的 `Selectors` 结构体将它们包含在 *static* 块中。
 
+```rust
+// in src/gdt.rs
 
+use x86_64::structures::gdt::SegmentSelector;
+
+lazy_static! {
+    static ref GDT: (GlobalDescriptorTable, Selectors) = {
+        let mut gdt = GlobalDescriptorTable::new();
+        let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
+        let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
+        (gdt, Selectors { code_selector, tss_selector })
+    };
+}
+
+struct Selectors {
+    code_selector: SegmentSelector,
+    tss_selector: SegmentSelector,
+}
+```
+
+现在可以使用选择子（*selectors*）重新加载 `cs` 段寄存器并加载新的 `TSS` ：
+
+```rust
+// in src/gdt.rs
+
+pub fn init() {
+    use x86_64::instructions::segmentation::set_cs;
+    use x86_64::instructions::tables::load_tss;
+
+    GDT.0.load();
+    unsafe {
+        set_cs(GDT.1.code_selector);
+        load_tss(GDT.1.tss_selector);
+    }
+}
+```
+
+我们使用 [`set_cs`](https://docs.rs/x86_64/0.12.1/x86_64/instructions/segmentation/fn.set_cs.html) 和 [`load_tss`](https://docs.rs/x86_64/0.12.1/x86_64/instructions/tables/fn.load_tss.html) 函数分别重新加载代码段寄存器和 `TSS` 。我们需要在 `unsafe` 代码块中调用这两个函数，因为它们均被声明为 `unsafe` —— 它们可能由于加载了非法的选择子而破坏内存安全。
+
+现在，合法的 *TSS* 和 中断栈表已经加载完毕，我们可以在 *IDT* 中设置用于双重异常的栈指针：
+
+```rust
+// in src/interrupts.rs
+
+use crate::gdt;
+
+lazy_static! {
+    static ref IDT: InterruptDescriptorTable = {
+        let mut idt = InterruptDescriptorTable::new();
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        unsafe {
+            idt.double_fault.set_handler_fn(double_fault_handler)
+                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); // new
+        }
+
+        idt
+    };
+}
+```
+
+ `set_stack_index` 方法是不安全的，因为调用者必须保证使用的指针是合法的并且没有被用于其它异常。
+
+That's it!  *CPU* 会在所有双重异常发生的时候切换到双重异常栈。因此，我们可以捕获所有双重异常——包括在内核栈溢出的情况中。
+
+![qemu-double-fault-on-stack-overflow](https://markdown-ngy.oss-cn-beijing.aliyuncs.com/qemu-double-fault-on-stack-overflow.png)
+
+从现在起，三重异常永远不会再次出现了！为了确保不会意外地弄坏上面的程序，我们应该加上测试。
 
 ## 栈溢出测试
 
