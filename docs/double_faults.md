@@ -377,13 +377,129 @@ That's it!  *CPU* 会在所有双重异常发生的时候切换到双重异常�
 
 ## 栈溢出测试
 
+为了测试新的 `gdt` 模块并且确保在栈溢出的情况下，双重异常处理函数被正确的调用，我们可以增加一个集成测试。思路是在测试函数中触发一个双重异常并验证双重异常处理函数被调用。
+
+从最小可用版本开始：
+
+```rust
+// in tests/stack_overflow.rs
+
+#![no_std]
+#![no_main]
+
+use core::panic::PanicInfo;
+
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    unimplemented!();
+}
+
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    blog_os::test_panic_handler(info)
+}
+```
+
+类似于 `panic_handler` 测试，新的测试不会运行在测试环境下（ [without a test harness](https://os.phil-opp.com/testing/#no-harness-tests)）。原因在于我们不能在双重异常之后继续执行，所以连续进行多个测试是行不通的。为了禁用测试环境，需要在 `Cargo.toml` 中增加以下配置：
+
+```rust
+# in Cargo.toml
+
+[[test]]
+name = "stack_overflow"
+harness = false
+```
+
+现在，执行 `cargo test --test stack_overflow` 会编译成功。测试当然会由于 `unimplemented` 宏的崩溃（panics）而失败。
+
 ### 实现 `_start`
+
+ `_start` 函数的实现如下所示：
+
+```rust
+// in tests/stack_overflow.rs
+
+use blog_os::serial_print;
+
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    serial_print!("stack_overflow::stack_overflow...\t");
+
+    blog_os::gdt::init();
+    init_test_idt();
+
+    // trigger a stack overflow
+    stack_overflow();
+
+    panic!("Execution continued after stack overflow");
+}
+
+#[allow(unconditional_recursion)]
+fn stack_overflow() {
+    stack_overflow(); // for each recursion, the return address is pushed
+    volatile::Volatile::new(0).read(); // prevent tail recursion optimizations
+}
+```
+
+调用 `gdt::init` 函数初始化新的 *GDT* 。我们调用了 `init_test_idt` 函数（稍后会解释它）而不是 `interrupts::init_idt` 函数。原因在于我们希望注册一个自定义的双重异常处理函数执行`exit_qemu(QemuExitCode::Success) ` 而不是直接崩溃（ *panicking*）。
+
+ `stack_overflow` 函数和 `main.rs` 中的函数几乎一致。唯一的不同是我们在函数末尾增加了额外的 [volatile](https://en.wikipedia.org/wiki/Volatile_(computer_programming)) 读，这是使用 [`Volatile`](https://docs.rs/volatile/0.2.6/volatile/struct.Volatile.html) 类型阻止编译器的尾调用优化（ [*tail call elimination*](https://en.wikipedia.org/wiki/Tail_call)）。此外，这个优化允许编译器将递归函数转化为循环。因此，函数调用的时候不会有额外的栈帧产生，栈的使用是固定不变的（*译注：上文中提到这个双重异常栈没有保护页去避免栈溢出。如果在双重异常处理函数中做任何过度使用函数栈的的事情，会导致栈溢出破坏栈地址以下的内存*）。
+
+在测试场景中，我们希望栈溢出的发生，所以在函数的末尾增加了一个模拟的 *volatile* 读语句，这个语句不会被编译器优化掉。因此，这个函数不再是尾递归，也不会被转化为循环。我们同时使用 `allow(unconditional_recursion)` 属性禁止了编译器的警告——这个函数会无休止地重复。
 
 ### 测试用IDT
 
+如上所述，这个测试需要独立持有双重异常处理函数的 *IDT* 。实现如下：
+
+```rust
+// in tests/stack_overflow.rs
+
+use lazy_static::lazy_static;
+use x86_64::structures::idt::InterruptDescriptorTable;
+
+lazy_static! {
+    static ref TEST_IDT: InterruptDescriptorTable = {
+        let mut idt = InterruptDescriptorTable::new();
+        unsafe {
+            idt.double_fault
+                .set_handler_fn(test_double_fault_handler)
+                .set_stack_index(blog_os::gdt::DOUBLE_FAULT_IST_INDEX);
+        }
+
+        idt
+    };
+}
+
+pub fn init_test_idt() {
+    TEST_IDT.load();
+}
+```
+
+这个实现和 `interrupts.rs` 中普通的 *IDT* 非常相似。和在普通的 *IDT* 中一样，我们在 *IST* 中将双重异常处理函数设置为独立的栈。 `init_test_idt` 函数通过 `load` 方法加载 *IDT* 到CPU中。
+
 ### 双重异常处理函数
 
+现在唯一缺少的便是双重异常处理函数了。实现如下：
 
+```rust
+// in tests/stack_overflow.rs
+
+use blog_os::{exit_qemu, QemuExitCode, serial_println};
+use x86_64::structures::idt::InterruptStackFrame;
+
+extern "x86-interrupt" fn test_double_fault_handler(
+    _stack_frame: &mut InterruptStackFrame,
+    _error_code: u64,
+) -> ! {
+    serial_println!("[ok]");
+    exit_qemu(QemuExitCode::Success);
+    loop {}
+}
+```
+
+当双重异常处理函数被调用，我们退出*QEMU*，并且退出码是代表着测试通过的成功退出码。随着集成测试各自独立地执行完毕，我们需要在测试文件的顶部再次设置 `#![feature(abi_x86_interrupt)]` 属性。
+
+现在可以使用 `cargo test --test stack_overflow`命令运行双重异常测试了（或者使用 `cargo test` 直接运行所有测试）。不出所料，控制台输出了 `stack_overflow... [ok]` 消息。如果注释掉 `set_stack_index` 行：测试应当失败。
 
 ## 总结
 
