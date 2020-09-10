@@ -2,7 +2,7 @@
 
 > 原文：[https://os.phil-opp.com/double-fault-exceptions/](https://os.phil-opp.com/double-fault-exceptions/)
 >
-> 原作者：@phil-opp
+> 原作者： [@Philipp Oppermann](https://github.com/phil-opp) 
 >
 > 译者：[倪广野](https://github.com/niguangye)
 
@@ -503,9 +503,21 @@ extern "x86-interrupt" fn test_double_fault_handler(
 
 ## 总结
 
+在这篇文章中，我们学到了双重异常及其触发条件，添加了基本的双重异常处理函数打印错误消息，同时补充了相应的集成测试。
 
+我们也让硬件支持了双重异常发生时的栈切换，这让它可以在栈溢出的情况下正常工作。在实现的同时，我们学到了任务状态段（*TSS*），包含其中的中断栈表（*IST*），以及旧体系架构中用于分段机制的全局描述符（*GDT*）。
 
 ## 接下来?
 
+下一篇文章，我们将阐明如何处理来自外部设备的中断，例如时钟、键盘或网卡等。这些硬件中断和异常十分相似，它们也会通过 *IDT* 分发到相应的处理函数。然而与异常不同的是，它们并不直接由 *CPU* 内部产生。中断控制器（*interrupt controller*）会汇总这些中断，然后根据它们的优先级高低发送到 *CPU* 。在下篇文章中，我们会介绍 [Intel 8259](https://en.wikipedia.org/wiki/Intel_8259) (“PIC”) 中断控制器，并学习如何实现键盘支持（*keyboard support*）。
 
+## 支持我
+
+创建并维护这个[博客](https://os.phil-opp.com/status-update/) 和相关的库是一个繁重的工作，但是我非常喜欢这个它。你的支持可以鼓励我投入更多的时间在新的内容，新的功能以及持续维护工作上。
+
+支持我的最好方式是 [*sponsor me on GitHub*](https://github.com/sponsors/phil-opp) 。GitHub 会匹配赞助（*译注：见[GitHub Sponsors Matching Fund](https://docs.github.com/en/free-pro-team@latest/github/supporting-the-open-source-community-with-github-sponsors/about-github-sponsors)*）直到2020年10月！我同时拥有 [*Patreon*](https://www.patreon.com/phil_opp) 和 [*Donorbox*](https://donorbox.org/phil-opp) 账户。最后一种是最灵活的，它支持多国货币和一次性捐赠。
+
+谢谢！
+
+> 译注：《支持我》章节中的“我”均指原作者 [@Philipp Oppermann](https://github.com/phil-opp) 。
 
