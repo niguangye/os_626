@@ -15,14 +15,15 @@ pub extern "C" fn _start() -> ! {
 
     os_626::init();
 
-    // 调用int3指令触发断点异常
-    x86_64::instructions::interrupts::int3();
+    fn stack_overflow(){
+        stack_overflow();
+    }
+
+    stack_overflow();
 
     #[cfg(test)]
     test_main();
-
     println!("It did not crash!");
-
     loop {}
 }
 
