@@ -15,11 +15,11 @@ pub extern "C" fn _start() -> ! {
 
     os_626::init();
 
-/*    fn stack_overflow(){
-        stack_overflow();
+    let ptr = 0x2039aa as *mut u32;
+    unsafe { let x = *ptr;
+        println!("*ptr is {}", x);
     }
-
-    stack_overflow();*/
+    unsafe { *ptr = 42; }
 
     #[cfg(test)]
     test_main();
