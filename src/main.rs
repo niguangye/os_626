@@ -6,10 +6,11 @@
 
 use core::panic::PanicInfo;
 use os_626::println;
+use bootloader::{ BootInfo, entry_point };
 
-#[no_mangle] // 禁用名称重整，确保Rust编译器输出一个名为_start的函数；否则编译器可能最终生成名为_ZN3blog_os4_start7hb173fedf945531caE的函数，无法让链接器正确辨别。
-// extern "C" 告诉编译器这个函数应当使用C语言的调用约定
-pub extern "C" fn _start() -> ! {
+entry_point!(kernel_main);
+
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     println!("Hello World{}", "!");
 
