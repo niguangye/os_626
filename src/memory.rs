@@ -1,7 +1,12 @@
-use x86_64::{structures::paging::PageTable, VirtAddr, PhysAddr};
+use x86_64::{structures::paging::{ PageTable, OffsetPageTable}, VirtAddr, PhysAddr};
+
+pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+    let level_4_table = active_level_4_table(physical_memory_offset);
+    OffsetPageTable::new(level_4_table, physical_memory_offset)
+}
 
 // 返回4级页表的可变引用
-pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr)->&'static mut PageTable {
+unsafe fn active_level_4_table(physical_memory_offset: VirtAddr)->&'static mut PageTable {
     use x86_64::registers::control::Cr3;
 
     // 从Cr3寄存器读取4级页表的物理帧

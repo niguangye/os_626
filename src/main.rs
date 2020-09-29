@@ -7,20 +7,21 @@
 use core::panic::PanicInfo;
 use os_626::println;
 use bootloader::{ BootInfo, entry_point };
-use os_626::memory::active_level_4_table;
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
-    use os_626::memory::translate_addr;
-    use x86_64::VirtAddr;
+    use os_626::memory;
+    use x86_64::{structures::paging::MapperAllSizes, VirtAddr};
 
     println!("Hello World{}", "!");
 
     os_626::init();
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+
+    let mapper = unsafe { memory::init(phys_mem_offset)};
 
     let addresses = [
         // the identity-mapped vga buffer page
@@ -35,7 +36,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     for &address in &addresses {
         let virt = VirtAddr::new(address);
-        let phys = unsafe { translate_addr(virt, phys_mem_offset) };
+        let phys = unsafe { memory::translate_addr(virt, phys_mem_offset) };
         println!("{:?} -> {:?}", virt, phys);
     }
 
