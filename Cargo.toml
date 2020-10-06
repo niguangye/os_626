@@ -6,6 +6,9 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[unstable]
+build-std = ["core", "compiler_builtins", "alloc"]
+
 [dependencies]
 bootloader = { version = "0.9.0", features = ["map_physical_memory"] }
 volatile = "0.2.3"
@@ -16,6 +19,7 @@ spin = "0.4.9"
 # 引入可编程中断控制器的操作库
 pic8259_simple = "0.2.0"
 pc-keyboard = "0.5.1"
+linked_list_allocator = "0.8.6"
 
 [dependencies.lazy_static]
 version = "1.0"
