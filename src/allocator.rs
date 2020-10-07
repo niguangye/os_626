@@ -22,7 +22,6 @@ use x86_64::{
     },
     VirtAddr,
 };
-use x86_64::structures::paging::PageSize;
 
 pub fn init_heap(
     mapper: &mut impl Mapper<Size4KiB>,
